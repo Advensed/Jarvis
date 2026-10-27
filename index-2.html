@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jarvis</title>
+<meta name="theme-color" content="#04090f">
+<meta name="color-scheme" content="dark">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600&family=Share+Tech+Mono&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #04090f;
+  --panel: #0a1722;
+  --line: #17384b;
+  --fg: #d4f1ff;
+  --muted: #6f93a6;
+  --accent: #4fd8ff;
+  --accent-soft: rgba(79,216,255,.14);
+  --warn: #ffb347;
+  --bad: #ff6b5e;
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-data: "Share Tech Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: radial-gradient(120% 60% at 50% 12%, #0b2233 0%, var(--bg) 62%);
+  background-color: var(--bg);
+  color: var(--fg);
+  font: 400 16px/1.45 var(--font-display);
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 8px; overflow: hidden;
+}
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font: 13px var(--font-data); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.top b { color: var(--accent); font-weight: 400; }
+#clock { font-size: 22px; color: var(--fg); letter-spacing: .06em; }
+.stage { display: grid; place-items: center; flex: 0 0 auto; }
+.reactor { width: min(46vw, 190px); aspect-ratio: 1; max-width: 100%; cursor: pointer; }
+.reactor svg { width: 100%; height: 100%; overflow: visible; }
+.ring { fill: none; stroke: var(--accent); transform-origin: 100px 100px; }
+.r1 { stroke-width: 1.5; stroke-dasharray: 4 7; animation: spin 24s linear infinite; opacity: .6; }
+.r2 { stroke-width: 3; stroke-dasharray: 60 22 8 22; animation: spin 14s linear infinite reverse; }
+.r3 { stroke-width: 1; stroke-dasharray: 2 5; animation: spin 40s linear infinite; opacity: .5; }
+.r4 { stroke-width: 2; opacity: .85; }
+.core { fill: var(--accent); opacity: .9; transform-origin: 100px 100px; animation: pulse 3.2s ease-in-out infinite; filter: drop-shadow(0 0 10px var(--accent)); }
+.tick { stroke: var(--accent); stroke-width: 2; opacity: .55; }
+body[data-state="listening"] .core { animation-duration: .9s; fill: var(--warn); filter: drop-shadow(0 0 12px var(--warn)); }
+body[data-state="thinking"] .r2 { animation-duration: 2.6s; }
+body[data-state="thinking"] .r1 { animation-duration: 6s; }
+body[data-state="speaking"] .core { animation-duration: .55s; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { transform: scale(.88); opacity: .7; } 50% { transform: scale(1.06); opacity: 1; } }
+#status { text-align: center; font: 12px var(--font-data); letter-spacing: .22em; text-transform: uppercase; color: var(--accent); min-height: 1.3em; }
+
+.log { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 6px 2px; scroll-behavior: smooth; }
+.msg { max-width: 92%; padding: 9px 12px; border: 1px solid var(--line); background: var(--panel); border-radius: 3px; overflow-wrap: anywhere; }
+.msg.me { align-self: flex-end; border-color: transparent; background: var(--accent-soft); }
+.msg.ai { align-self: flex-start; border-left: 2px solid var(--accent); }
+.msg.sys { align-self: center; max-width: 100%; border: none; background: none; color: var(--muted); font: 12px var(--font-data); text-align: center; }
+.msg.err { align-self: center; max-width: 100%; border-color: var(--bad); color: var(--bad); font-size: 14px; }
+.msg small { display: block; font: 11px var(--font-data); letter-spacing: .14em; color: var(--accent); text-transform: uppercase; margin-bottom: 2px; }
+.msg a { color: var(--accent); }
+.linkbtn { display: inline-block; margin-top: 6px; padding: 8px 12px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; border-radius: 2px; font-size: 14px; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; background: transparent; color: var(--fg); border: 1px solid var(--line); padding: 7px 12px; font: 13px var(--font-display); border-radius: 2px; cursor: pointer; }
+.chip:active { border-color: var(--accent); color: var(--accent); }
+
+.bar { display: flex; gap: 8px; align-items: stretch; }
+.bar input[type=text] { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--line); color: var(--fg); font: 16px var(--font-display); padding: 12px; border-radius: 2px; }
+.bar input::placeholder { color: var(--muted); }
+.btn { flex: 0 0 auto; width: 48px; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--accent); border-radius: 2px; cursor: pointer; padding: 0; }
+.btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.btn.mute[aria-pressed="true"] { background: var(--panel); color: var(--muted); }
+.btn:disabled { opacity: .4; }
+:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
+
+/* start overlay */
+#start { position: fixed; inset: 0; z-index: 20; background: rgba(4,9,15,.94); display: grid; place-content: center; justify-items: center; gap: 18px; text-align: center; padding: 24px; }
+#start[hidden] { display: none; }
+#start .reactor { width: min(62vw, 240px); }
+#start h1 { margin: 0; font: 600 22px var(--font-display); letter-spacing: .3em; color: var(--accent); }
+#start p { margin: 0; color: var(--muted); font: 13px var(--font-data); letter-spacing: .1em; text-transform: uppercase; }
+.go { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 14px 28px; font: 600 15px var(--font-display); letter-spacing: .2em; text-transform: uppercase; border-radius: 2px; cursor: pointer; }
+.go:active { background: var(--accent-soft); }
+.linkish { background: none; border: none; color: var(--muted); font: 13px var(--font-data); text-decoration: underline; cursor: pointer; }
+
+/* settings */
+#settings { position: fixed; inset: 0; z-index: 30; background: rgba(4,9,15,.97); overflow-y: auto; padding: max(18px, env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); }
+#settings[hidden] { display: none; }
+#settings .wrap { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+#settings h2 { margin: 0; font: 600 18px var(--font-display); letter-spacing: .2em; color: var(--accent); text-transform: uppercase; }
+#settings label { display: flex; flex-direction: column; gap: 6px; font: 12px var(--font-data); letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+#settings input, #settings select { background: var(--panel); border: 1px solid var(--line); color: var(--fg); font: 16px var(--font-display); padding: 12px; border-radius: 2px; width: 100%; text-transform: none; letter-spacing: 0; }
+#settings .note { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0; }
+#settings .note a { color: var(--accent); }
+#settings .row { display: flex; gap: 10px; flex-wrap: wrap; }
+#settings input[type=range] { padding: 0; accent-color: var(--accent); }
+@media (max-height: 640px) { .reactor { width: 110px; } }
+@media (prefers-reduced-motion: reduce) { .reactor *, .log { animation: none !important; scroll-behavior: auto; } }
+</style>
+</head>
+<body data-state="idle">
+
+<div class="top">
+  <div><b>J.A.R.V.I.S.</b><br><span id="date"></span></div>
+  <div id="clock">--:--</div>
+  <div style="text-align:right"><span id="bat">BAT --</span><br><span id="link">ONLINE</span></div>
+</div>
+
+<div class="stage">
+  <div class="reactor" id="reactor" role="button" tabindex="0" aria-label="Tocar para falar">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="ring r3" cx="100" cy="100" r="96"/>
+      <circle class="ring r1" cx="100" cy="100" r="84"/>
+      <circle class="ring r2" cx="100" cy="100" r="68"/>
+      <circle class="ring r4" cx="100" cy="100" r="46"/>
+      <g class="tickset"></g>
+      <polygon class="core" points="100,70 126,85 126,115 100,130 74,115 74,85"/>
+    </svg>
+  </div>
+</div>
+<div id="status" role="status" aria-live="polite">Em espera</div>
+
+<div class="log" id="log" aria-live="polite"></div>
+
+<div class="chips" id="chips">
+  <button class="chip" data-q="Como está o tempo agora aqui onde estou?">Clima</button>
+  <button class="chip" data-q="Que horas são e que dia é hoje?">Hora e data</button>
+  <button class="chip" data-q="Quanto é 18% de 2450?">Calcular</button>
+  <button class="chip" data-q="Cria um timer de 5 minutos para o café.">Timer 5 min</button>
+  <button class="chip" data-q="Anota: comprar cabo USB-C.">Anotar</button>
+  <button class="chip" data-q="Quais são minhas anotações?">Minhas notas</button>
+  <button class="chip" data-q="Muda a interface para armadura dourada.">Cor</button>
+</div>
+
+<form class="bar" id="form" autocomplete="off">
+  <button class="btn" type="button" id="setBtn" aria-label="Configurações">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
+  </button>
+  <button class="btn mute" type="button" id="muteBtn" aria-pressed="false" aria-label="Voz de resposta ligada">
+    <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="waves" d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg>
+  </button>
+  <input id="txt" type="text" enterkeyhint="send" placeholder="Fale ou escreva um comando" aria-label="Comando">
+  <button class="btn" type="button" id="micBtn" aria-pressed="false" aria-label="Falar">
+    <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+  </button>
+  <button class="btn" type="submit" id="sendBtn" aria-label="Enviar">
+    <svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 17-3-7z"/></svg>
+  </button>
+</form>
+
+<div id="start">
+  <div class="reactor" id="startReactor">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="ring r3" cx="100" cy="100" r="96"/>
+      <circle class="ring r1" cx="100" cy="100" r="84"/>
+      <circle class="ring r2" cx="100" cy="100" r="68"/>
+      <circle class="ring r4" cx="100" cy="100" r="46"/>
+      <g class="tickset"></g>
+      <polygon class="core" points="100,70 126,85 126,115 100,130 74,115 74,85"/>
+    </svg>
+  </div>
+  <h1>J.A.R.V.I.S.</h1>
+  <p id="startHint">Sistemas prontos</p>
+  <button class="go" id="goBtn">Ativar</button>
+  <button class="linkish" id="startSet">Configurações</button>
+</div>
+
+<div id="settings" hidden>
+  <div class="wrap">
+    <h2>Configurações</h2>
+    <label for="keyIn">Chave da API do Gemini
+      <input id="keyIn" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza...">
+    </label>
+    <p class="note">Gratuita, sem cartão: entre em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> com sua conta Google e toque em criar chave. A chave fica guardada só neste aparelho e é enviada apenas ao Google. Não use este app em aparelho de outra pessoa. No plano gratuito o Google pode usar o conteúdo das conversas para melhorar seus produtos, então não fale de dados sensíveis.</p>
+    <label for="modelIn">Modelo
+      <input id="modelIn" type="text" autocapitalize="off" spellcheck="false" placeholder="gemini-3.8-flash">
+    </label>
+    <p class="note">Se aparecer "modelo não encontrado", veja o nome atual do modelo Flash no AI Studio e troque aqui.</p>
+    <label for="titleIn">Como ele deve te chamar
+      <input id="titleIn" type="text" placeholder="senhor">
+    </label>
+    <label for="cityIn">Cidade padrão para o clima (opcional)
+      <input id="cityIn" type="text" placeholder="Ex.: São Paulo">
+    </label>
+    <label for="voiceIn">Voz
+      <select id="voiceIn"><option value="">Automática (português do Brasil)</option></select>
+    </label>
+    <label for="pitchIn">Tom (mais grave à esquerda)
+      <input id="pitchIn" type="range" min="0.5" max="1.5" step="0.05" value="0.85">
+    </label>
+    <label for="rateIn">Velocidade
+      <input id="rateIn" type="range" min="0.7" max="1.3" step="0.05" value="0.98">
+    </label>
+    <p class="note">As vozes disponíveis dependem do seu celular. Para ter mais opções, instale vozes em Configurações do Android, Texto para fala.</p>
+    <div class="row"><button class="go" id="voiceTest" type="button">Testar voz</button></div>
+    <div class="row">
+      <button class="go" id="saveSet" type="button">Salvar</button>
+      <button class="linkish" id="closeSet" type="button">Fechar</button>
+      <button class="linkish" id="clearAll" type="button">Apagar chave e notas</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var logEl = $("log"), statusEl = $("status"), txt = $("txt");
+
+  /* ---------- storage ---------- */
+  function lsGet(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  var cfg = {
+    key: lsGet("jv-gkey", ""),
+    model: lsGet("jv-gmodel", "gemini-3.8-flash"),
+    title: lsGet("jv-title", "senhor"),
+    city: lsGet("jv-city", ""),
+    voice: lsGet("jv-voice", ""),
+    rate: parseFloat(lsGet("jv-rate", "0.98")) || 0.98,
+    pitch: parseFloat(lsGet("jv-pitch", "0.85")) || 0.85
+  };
+
+  /* ---------- reactor ticks ---------- */
+  var tickSvg = "";
+  for (var i = 0; i < 24; i++) {
+    var a = i * 15 * Math.PI / 180, r1 = 52, r2 = i % 2 ? 57 : 61;
+    tickSvg += '<line class="tick" x1="' + (100 + r1 * Math.cos(a)).toFixed(1) + '" y1="' + (100 + r1 * Math.sin(a)).toFixed(1) +
+      '" x2="' + (100 + r2 * Math.cos(a)).toFixed(1) + '" y2="' + (100 + r2 * Math.sin(a)).toFixed(1) + '"/>';
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".tickset"), function (g) { g.innerHTML = tickSvg; });
+
+  /* ---------- state + log ---------- */
+  function setState(s, label) { document.body.setAttribute("data-state", s); statusEl.textContent = label; }
+  function addMsg(kind, text) {
+    var d = document.createElement("div");
+    d.className = "msg " + kind;
+    if (kind === "ai" || kind === "me") {
+      var s = document.createElement("small");
+      s.textContent = kind === "ai" ? "Jarvis" : "Você";
+      d.appendChild(s);
+    }
+    var p = document.createElement("span");
+    p.textContent = text;
+    d.appendChild(p);
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+    return p;
+  }
+  function addLink(url, label) {
+    var a = document.createElement("a");
+    a.className = "linkbtn"; a.href = url; a.target = "_blank"; a.rel = "noopener";
+    a.textContent = label || url;
+    var d = document.createElement("div");
+    d.className = "msg ai"; d.appendChild(a);
+    logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /* ---------- clock / battery / link ---------- */
+  function tick() {
+    var n = new Date();
+    $("clock").textContent = n.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    $("date").textContent = n.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
+  }
+  tick(); setInterval(tick, 10000);
+  try {
+    if (navigator.getBattery) navigator.getBattery().then(function (b) {
+      function up() { $("bat").textContent = "BAT " + Math.round(b.level * 100) + "%" + (b.charging ? " +" : ""); }
+      up(); b.addEventListener("levelchange", up); b.addEventListener("chargingchange", up);
+    }).catch(function () {});
+  } catch (e) {}
+  function setLink() { $("link").textContent = navigator.onLine ? "ONLINE" : "OFFLINE"; }
+  window.addEventListener("online", setLink); window.addEventListener("offline", setLink); setLink();
+
+  /* ---------- voice out ---------- */
+  var speakOn = true, ptVoice = null;
+  function allVoices() { try { return speechSynthesis.getVoices() || []; } catch (e) { return []; } }
+  function isPt(v) { return /^pt([-_]|$)/i.test(v.lang); }
+  function pickVoice() {
+    var vs = allVoices();
+    var chosen = cfg.voice ? vs.filter(function (v) { return v.name === cfg.voice; })[0] : null;
+    var pts = vs.filter(isPt);
+    ptVoice = chosen || pts.filter(function (v) { return /^pt[-_]BR/i.test(v.lang); })[0] || pts[0] || null;
+  }
+  function fillVoices() {
+    var sel = $("voiceIn"); if (!sel) return;
+    var vs = allVoices().slice().sort(function (a, b) { return (isPt(b) ? 1 : 0) - (isPt(a) ? 1 : 0) || a.name.localeCompare(b.name); });
+    sel.innerHTML = "";
+    var auto = document.createElement("option"); auto.value = ""; auto.textContent = "Automática (português do Brasil)"; sel.appendChild(auto);
+    vs.forEach(function (v) {
+      var o = document.createElement("option"); o.value = v.name; o.textContent = v.name + " (" + v.lang + ")"; sel.appendChild(o);
+    });
+    sel.value = cfg.voice;
+  }
+  try { pickVoice(); speechSynthesis.onvoiceschanged = function () { pickVoice(); fillVoices(); }; } catch (e) {}
+  function speak(text, opt) {
+    opt = opt || {};
+    return new Promise(function (resolve) {
+      if ((!speakOn && !opt.force) || !("speechSynthesis" in window)) { resolve(); return; }
+      var finished = false;
+      function done() { if (finished) return; finished = true; clearTimeout(guard); resolve(); }
+      var guard = setTimeout(done, Math.max(4000, text.length * 110));
+      try {
+        speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = "pt-BR";
+        var v = opt.voiceName !== undefined ? (allVoices().filter(function (x) { return x.name === opt.voiceName; })[0] || null) : null;
+        if (v) u.voice = v; else if (ptVoice) u.voice = ptVoice;
+        u.rate = opt.rate || cfg.rate; u.pitch = opt.pitch || cfg.pitch;
+        u.onstart = function () { setState("speaking", "Respondendo"); };
+        u.onend = u.onerror = done;
+        speechSynthesis.speak(u);
+      } catch (e) { done(); }
+    });
+  }
+    $("muteBtn").addEventListener("click", function () {
+    speakOn = !speakOn;
+    this.setAttribute("aria-pressed", String(!speakOn));
+    this.setAttribute("aria-label", speakOn ? "Voz de resposta ligada" : "Voz de resposta desligada");
+    $("waves").style.display = speakOn ? "" : "none";
+    if (!speakOn) { try { speechSynthesis.cancel(); } catch (e) {} setState("idle", "Em espera"); }
+  });
+
+  function beep() {
+    try {
+      var C = window.AudioContext || window.webkitAudioContext, c = new C();
+      [0, .25, .5].forEach(function (t) {
+        var o = c.createOscillator(), g = c.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(c.destination);
+        g.gain.setValueAtTime(.0001, c.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(.3, c.currentTime + t + .02);
+        g.gain.exponentialRampToValueAtTime(.0001, c.currentTime + t + .2);
+        o.start(c.currentTime + t); o.stop(c.currentTime + t + .22);
+      });
+    } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+  }
+
+  /* ---------- notes ---------- */
+  function loadNotes() { try { return JSON.parse(lsGet("jv-notes", "[]")); } catch (e) { return []; } }
+  function saveNotes(n) { lsSet("jv-notes", JSON.stringify(n)); }
+
+  /* ---------- weather (Open-Meteo, no key) ---------- */
+  var WCODE = function (c) {
+    if (c === 0) return "céu limpo";
+    if (c <= 2) return "parcialmente nublado";
+    if (c === 3) return "nublado";
+    if (c === 45 || c === 48) return "neblina";
+    if (c >= 51 && c <= 57) return "garoa";
+    if (c >= 61 && c <= 67) return "chuva";
+    if (c >= 71 && c <= 77) return "neve";
+    if (c >= 80 && c <= 82) return "pancadas de chuva";
+    if (c >= 95) return "tempestade";
+    return "tempo variável";
+  };
+  function getPos() {
+    return new Promise(function (res, rej) {
+      if (!navigator.geolocation) { rej(new Error("sem localização")); return; }
+      navigator.geolocation.getCurrentPosition(function (p) { res({ lat: p.coords.latitude, lon: p.coords.longitude, name: "sua localização" }); },
+        function () { rej(new Error("localização negada")); }, { timeout: 8000, maximumAge: 600000 });
+    });
+  }
+  async function geocode(city) {
+    var r = await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=pt&name=" + encodeURIComponent(city));
+    var j = await r.json();
+    if (!j.results || !j.results.length) throw new Error("cidade não encontrada");
+    var x = j.results[0];
+    return { lat: x.latitude, lon: x.longitude, name: x.name + (x.admin1 ? ", " + x.admin1 : "") };
+  }
+  async function weather(city) {
+    var place;
+    var c = (city || cfg.city || "").trim();
+    if (c) place = await geocode(c);
+    else {
+      try { place = await getPos(); } catch (e) { throw new Error("Não sei onde o senhor está. Diga a cidade ou salve uma cidade padrão nas configurações."); }
+    }
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + place.lat + "&longitude=" + place.lon +
+      "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto";
+    var r = await fetch(url), j = await r.json();
+    var cu = j.current, d = j.daily;
+    return "Local: " + place.name + ". Agora: " + Math.round(cu.temperature_2m) + " °C (sensação " + Math.round(cu.apparent_temperature) + " °C), " +
+      WCODE(cu.weather_code) + ", vento " + Math.round(cu.wind_speed_10m) + " km/h. Hoje: mínima " + Math.round(d.temperature_2m_min[0]) +
+      " °C, máxima " + Math.round(d.temperature_2m_max[0]) + " °C, chance de chuva " + d.precipitation_probability_max[0] + "%.";
+  }
+
+  /* ---------- tools ---------- */
+  var COLORS = {
+    ciano: ["#4fd8ff", "rgba(79,216,255,.14)"], dourado: ["#ffc24a", "rgba(255,194,74,.15)"],
+    vermelho: ["#ff5348", "rgba(255,83,72,.15)"], verde: ["#5cffa8", "rgba(92,255,168,.14)"], roxo: ["#b48bff", "rgba(180,139,255,.15)"]
+  };
+  function applyColor(n) {
+    var c = COLORS[n]; if (!c) throw new Error("Cor desconhecida");
+    document.documentElement.style.setProperty("--accent", c[0]);
+    document.documentElement.style.setProperty("--accent-soft", c[1]);
+    lsSet("jv-color", n);
+  }
+  try { var sc = lsGet("jv-color", ""); if (sc && COLORS[sc]) applyColor(sc); } catch (e) {}
+
+  var timers = [];
+  var TOOLS = [
+    { name: "hora_atual", description: "Data e hora locais do aparelho.", input_schema: { type: "object", properties: {} },
+      run: function () { return new Date().toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" }); } },
+    { name: "clima", description: "Clima atual e previsão do dia. Sem cidade, usa a localização do aparelho ou a cidade padrão.",
+      input_schema: { type: "object", properties: { cidade: { type: "string" } } },
+      run: function (i) { return weather(i.cidade); } },
+    { name: "calcular", description: "Calcula uma expressão com + - * / ( ) e ^ para potência. Para porcentagem, converta antes (18% de 2450 = 0.18*2450).",
+      input_schema: { type: "object", properties: { expressao: { type: "string" } }, required: ["expressao"] },
+      run: function (i) {
+        var e = String(i.expressao || "").replace(/,/g, ".").replace(/\^/g, "**").replace(/[x×]/gi, "*");
+        if (!/^[0-9+\-*/().\s]+$/.test(e)) throw new Error("Expressão inválida");
+        var v = Function('"use strict";return (' + e + ")")();
+        if (typeof v !== "number" || !isFinite(v)) throw new Error("Resultado inválido");
+        return String(Math.round(v * 1e8) / 1e8);
+      } },
+    { name: "criar_timer", description: "Cria um timer que toca alarme e avisa por voz. Só dispara com o app aberto.",
+      input_schema: { type: "object", properties: { segundos: { type: "number" }, rotulo: { type: "string" } }, required: ["segundos"] },
+      run: function (i) {
+        var s = Math.max(1, Math.min(86400, Math.round(i.segundos))), label = i.rotulo || "Timer";
+        timers.push(setTimeout(function () {
+          beep(); var m = "O timer " + label + " terminou, " + cfg.title + ".";
+          addMsg("ai", m); speak(m);
+        }, s * 1000));
+        return "Timer de " + s + " segundos criado: " + label;
+      } },
+    { name: "anotar", description: "Salva uma anotação curta no aparelho.",
+      input_schema: { type: "object", properties: { texto: { type: "string" } }, required: ["texto"] },
+      run: function (i) { var n = loadNotes(); n.push({ t: String(i.texto).slice(0, 300), d: Date.now() }); n = n.slice(-50); saveNotes(n); return "Anotação salva. Total: " + n.length; } },
+    { name: "listar_notas", description: "Lista as anotações salvas.", input_schema: { type: "object", properties: {} },
+      run: function () { var n = loadNotes(); return n.length ? n.map(function (x, k) { return (k + 1) + ". " + x.t; }).join("\n") : "Nenhuma anotação."; } },
+    { name: "apagar_notas", description: "Apaga todas as anotações. Só se o usuário pedir explicitamente.", input_schema: { type: "object", properties: {} },
+      run: function () { saveNotes([]); return "Anotações apagadas."; } },
+    { name: "status_aparelho", description: "Bateria, conexão e tela do aparelho.", input_schema: { type: "object", properties: {} },
+      run: function () {
+        var base = "Conexão: " + (navigator.onLine ? "online" : "offline") + ". Tela: " + innerWidth + "x" + innerHeight + ".";
+        if (!navigator.getBattery) return base + " Bateria indisponível neste navegador.";
+        return navigator.getBattery().then(function (b) { return base + " Bateria: " + Math.round(b.level * 100) + "%" + (b.charging ? ", carregando." : "."); }).catch(function () { return base; });
+      } },
+    { name: "mudar_cor_interface", description: "Troca a cor da interface: ciano, dourado, vermelho, verde ou roxo. Armadura Mark III = dourado.",
+      input_schema: { type: "object", properties: { cor: { type: "string", enum: ["ciano", "dourado", "vermelho", "verde", "roxo"] } }, required: ["cor"] },
+      run: function (i) { applyColor(i.cor); return "Interface em " + i.cor; } },
+    { name: "mostrar_link", description: "Mostra um botão tocável na tela que abre um link (mapa, site, WhatsApp, YouTube, busca). O sistema não abre sozinho: o usuário toca. Exemplos: https://www.google.com/maps/search/?api=1&query=padaria+perto ; https://www.youtube.com/results?search_query=musica ; https://wa.me/55DDDNUMERO?text=oi",
+      input_schema: { type: "object", properties: { url: { type: "string" }, rotulo: { type: "string" } }, required: ["url"] },
+      run: function (i) {
+        if (!/^https:\/\//i.test(i.url)) throw new Error("Só links https");
+        addLink(i.url, i.rotulo || "Abrir"); return "Botão exibido; o usuário precisa tocar nele.";
+      } }
+  ];
+  function toolDocs() {
+    return TOOLS.map(function (t) {
+      var props = (t.input_schema && t.input_schema.properties) || {};
+      var args = Object.keys(props).length ? JSON.stringify(props) : "sem argumentos";
+      return "- " + t.name + " (" + args + "): " + t.description;
+    }).join("\n");
+  }
+
+  function systemPrompt() {
+    return [
+      "Você é J.A.R.V.I.S., o assistente de IA do Tony Stark, rodando como app no celular do usuário.",
+      "Fale português do Brasil, com educação refinada e um toque de ironia seca. Trate o usuário por \"" + cfg.title + "\".",
+      "Sua fala será lida em voz alta: 1 a 3 frases curtas, sem markdown, sem listas, sem emojis, sem URLs na fala.",
+      "Você NÃO consegue abrir apps, ligar, mandar mensagem sozinho, acessar contatos, câmera nem controlar dispositivos. Para abrir algo, use a ferramenta mostrar_link e diga que é só tocar no botão.",
+      "Para conhecimento geral, ideias, traduções e planejamento, responda normalmente. Não invente dados em tempo real que as ferramentas não dão (notícias, trânsito, cotações).",
+      "Agora: " + new Date().toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" }) + ".",
+      "",
+      "FORMATO OBRIGATÓRIO: responda SEMPRE com um único objeto JSON e nada fora dele, assim:",
+      '{"fala": "texto curto para falar em voz alta", "acoes": [{"ferramenta": "nome", "args": {}}]}',
+      "O campo acoes é opcional. Quando precisar de ferramentas, preencha acoes e deixe fala vazia; o sistema devolverá os resultados em uma mensagem iniciada por RESULTADOS_DAS_FERRAMENTAS e você então responde com a fala final (sem acoes).",
+      "Use ferramentas só quando combinarem com o pedido. Ferramentas disponíveis:",
+      toolDocs()
+    ].join("\n");
+  }
+
+  /* ---------- Gemini API ---------- */
+  var convo = []; // [{role: "user"|"model", parts: [{text}]}]
+  var TOOLMSG = "RESULTADOS_DAS_FERRAMENTAS";
+  function trimConvo() {
+    if (convo.length <= 24) return;
+    for (var i = convo.length - 20; i < convo.length; i++) {
+      if (convo[i].role === "user" && convo[i].parts[0].text.indexOf(TOOLMSG) !== 0) { convo = convo.slice(i); return; }
+    }
+  }
+  async function callApi() {
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(cfg.model) + ":generateContent";
+    var r = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": cfg.key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt() }] },
+        contents: convo,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024, responseMimeType: "application/json" }
+      })
+    });
+    if (!r.ok) {
+      var msg = ""; try { var j = await r.json(); msg = j.error && j.error.message || ""; } catch (e) {}
+      var err = new Error(msg || ("HTTP " + r.status)); err.status = r.status; throw err;
+    }
+    var data = await r.json();
+    var cand = data.candidates && data.candidates[0];
+    if (!cand || !cand.content || !cand.content.parts) {
+      var why = (data.promptFeedback && data.promptFeedback.blockReason) || (cand && cand.finishReason) || "sem resposta";
+      var e2 = new Error("O modelo não respondeu (" + why + ")"); e2.status = 0; throw e2;
+    }
+    return cand.content.parts.filter(function (p) { return typeof p.text === "string" && !p.thought; }).map(function (p) { return p.text; }).join("");
+  }
+  async function callApiRetry() {
+    var waits = [1500, 3500, 6000];
+    for (var t = 0; ; t++) {
+      try { return await callApi(); }
+      catch (err) {
+        var transient = err.status === 503 || err.status === 500 || /high demand|overloaded|unavailable/i.test(String(err.message));
+        if (!transient || t >= waits.length) throw err;
+        setState("thinking", "Servidor ocupado, tentando de novo");
+        await new Promise(function (r) { setTimeout(r, waits[t]); });
+      }
+    }
+  }
+  function parseReply(t) {
+    var s = String(t || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    var a = s.indexOf("{"), b = s.lastIndexOf("}");
+    if (a !== -1 && b > a) {
+      try {
+        var o = JSON.parse(s.slice(a, b + 1));
+        return { fala: typeof o.fala === "string" ? o.fala.trim() : "", acoes: Array.isArray(o.acoes) ? o.acoes : [] };
+      } catch (e) {}
+    }
+    return { fala: s, acoes: [] };
+  }
+  async function ask(text) {
+    trimConvo();
+    convo.push({ role: "user", parts: [{ text: text }] });
+    for (var n = 0; n < 5; n++) {
+      var raw = await callApiRetry();
+      convo.push({ role: "model", parts: [{ text: raw || "{}" }] });
+      var rep = parseReply(raw);
+      if (rep.acoes.length) {
+        var results = [];
+        for (var k = 0; k < rep.acoes.length && k < 4; k++) {
+          var a = rep.acoes[k] || {};
+          var tool = TOOLS.filter(function (t) { return t.name === a.ferramenta; })[0];
+          try {
+            if (!tool) throw new Error("Ferramenta desconhecida");
+            var out = await tool.run(a.args || {});
+            results.push({ ferramenta: a.ferramenta, resultado: String(out) });
+          } catch (e) {
+            results.push({ ferramenta: a.ferramenta, erro: e.message });
+          }
+        }
+        convo.push({ role: "user", parts: [{ text: TOOLMSG + ": " + JSON.stringify(results) }] });
+        continue;
+      }
+      return rep.fala || "Feito, " + cfg.title + ".";
+    }
+    return "Não consegui concluir esse pedido, " + cfg.title + ".";
+  }
+
+    /* ---------- conversation flow ---------- */
+  var busy = false, conv = false, recog = null, listening = false, idleMisses = 0;
+
+  function friendly(err) {
+    var m = String(err.message || "");
+    if (err.status === 400 && /api key|API_KEY/i.test(m)) return "A chave da API foi recusada. Confira nas configurações.";
+    if (err.status === 401 || err.status === 403) return "A chave foi recusada ou não tem permissão. Gere outra no Google AI Studio.";
+    if (err.status === 404) return "O modelo \"" + cfg.model + "\" não foi encontrado. Troque o nome do modelo nas configurações.";
+    if (err.status === 429) return "Limite gratuito atingido por agora. Espere um pouco e tente de novo.";
+    if (err.status === 503 || /high demand|overloaded/i.test(m)) return "O Google está sobrecarregado agora. Tente de novo em alguns instantes.";
+    if (!navigator.onLine) return "Sem internet no momento.";
+    if (/failed to fetch|networkerror|load failed/i.test(m)) return "Não consegui falar com o Google. Confira a internet e a chave.";
+    return "Falha na comunicação: " + m;
+  }
+
+  async function handle(text) {
+    text = (text || "").trim();
+    if (!text || busy) return;
+    if (!cfg.key) { addMsg("err", "Falta a chave do Gemini. Abra as configurações."); openSettings(); return; }
+    busy = true; $("sendBtn").disabled = true;
+    try { speechSynthesis.cancel(); } catch (e) {}
+    addMsg("me", text); txt.value = "";
+    if (/^(tchau|encerrar|pode parar|até mais|desligar)\b/i.test(text)) {
+      var bye = "Até logo, " + cfg.title + ".";
+      addMsg("ai", bye); conv = false; busy = false; $("sendBtn").disabled = false;
+      await speak(bye); setState("idle", "Em espera"); return;
+    }
+    setState("thinking", "Processando");
+    var reply;
+    try { reply = await ask(text); }
+    catch (err) {
+      addMsg("err", friendly(err)); busy = false; $("sendBtn").disabled = false; conv = false; setState("idle", "Em espera"); return;
+    }
+    addMsg("ai", reply);
+    busy = false; $("sendBtn").disabled = false;
+    await speak(reply);
+    setState("idle", "Em espera");
+    if (conv) startListen();
+  }
+
+  /* ---------- voice in ---------- */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function stopListenUI() { listening = false; $("micBtn").setAttribute("aria-pressed", "false"); if (!busy) setState("idle", "Em espera"); }
+  function startListen() {
+    if (!SR) { conv = false; addMsg("sys", "Este navegador não tem reconhecimento de voz. Use o microfone do teclado do celular."); return; }
+    if (listening || busy) return;
+    var heard = "";
+    try {
+      recog = new SR(); recog.lang = "pt-BR"; recog.interimResults = true; recog.continuous = false;
+      recog.onresult = function (ev) {
+        var t = "";
+        for (var i = ev.resultIndex; i < ev.results.length; i++) { t += ev.results[i][0].transcript; }
+        heard = t; txt.value = t;
+      };
+      recog.onerror = function (ev) {
+        stopListenUI();
+        if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+          conv = false; addMsg("err", "O microfone está bloqueado. Libere nas permissões do navegador ou use o microfone do teclado.");
+        } else if (ev.error === "network") { conv = false; addMsg("err", "O reconhecimento de voz precisa de internet."); }
+      };
+      recog.onend = function () {
+        var t = heard.trim(); stopListenUI();
+        if (t) { idleMisses = 0; handle(t); }
+        else if (conv) {
+          idleMisses++;
+          if (idleMisses >= 3) { conv = false; idleMisses = 0; addMsg("sys", "Modo conversa pausado. Toque no reator para continuar."); }
+          else setTimeout(startListen, 250);
+        }
+      };
+      recog.start(); listening = true;
+      $("micBtn").setAttribute("aria-pressed", "true"); setState("listening", "Ouvindo");
+    } catch (e) { stopListenUI(); conv = false; addMsg("sys", "Microfone indisponível. Use o microfone do teclado."); }
+  }
+  function toggleConv() {
+    if (listening || conv) { conv = false; try { if (recog) recog.stop(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} stopListenUI(); setState("idle", "Em espera"); return; }
+    conv = true; idleMisses = 0; startListen();
+  }
+  $("micBtn").addEventListener("click", toggleConv);
+  $("reactor").addEventListener("click", toggleConv);
+  $("reactor").addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleConv(); } });
+
+  $("form").addEventListener("submit", function (e) { e.preventDefault(); handle(txt.value); });
+  $("chips").addEventListener("click", function (e) { var b = e.target.closest(".chip"); if (b) handle(b.getAttribute("data-q")); });
+
+  /* ---------- settings ---------- */
+  function openSettings() {
+    $("keyIn").value = cfg.key; $("modelIn").value = cfg.model; $("titleIn").value = cfg.title; $("cityIn").value = cfg.city;
+    fillVoices(); $("voiceIn").value = cfg.voice; $("pitchIn").value = cfg.pitch; $("rateIn").value = cfg.rate;
+    $("settings").hidden = false;
+  }
+  function closeSettings() { $("settings").hidden = true; updateStartHint(); }
+  $("setBtn").addEventListener("click", openSettings);
+  $("startSet").addEventListener("click", openSettings);
+  $("closeSet").addEventListener("click", closeSettings);
+  $("voiceTest").addEventListener("click", function () {
+    speak("Boa noite, " + ($("titleIn").value.trim() || "senhor") + ". Todos os sistemas estão operacionais.", {
+      force: true, voiceName: $("voiceIn").value, pitch: parseFloat($("pitchIn").value), rate: parseFloat($("rateIn").value)
+    }).then(function () { setState("idle", "Em espera"); });
+  });
+  $("saveSet").addEventListener("click", function () {
+    cfg.key = $("keyIn").value.trim(); cfg.model = $("modelIn").value.trim() || "gemini-3.8-flash";
+    cfg.title = $("titleIn").value.trim() || "senhor"; cfg.city = $("cityIn").value.trim();
+    cfg.voice = $("voiceIn").value; cfg.pitch = parseFloat($("pitchIn").value) || 0.85; cfg.rate = parseFloat($("rateIn").value) || 0.98; pickVoice();
+    lsSet("jv-gkey", cfg.key); lsSet("jv-gmodel", cfg.model); lsSet("jv-title", cfg.title); lsSet("jv-city", cfg.city);
+    lsSet("jv-voice", cfg.voice); lsSet("jv-pitch", String(cfg.pitch)); lsSet("jv-rate", String(cfg.rate));
+    closeSettings(); addMsg("sys", "Configurações salvas.");
+  });
+  $("clearAll").addEventListener("click", function () {
+    lsDel("jv-gkey"); lsDel("jv-notes"); cfg.key = ""; $("keyIn").value = ""; addMsg("sys", "Chave e anotações apagadas deste aparelho.");
+  });
+  function updateStartHint() { $("startHint").textContent = cfg.key ? "Sistemas prontos" : "Falta a chave do Gemini"; }
+  updateStartHint();
+
+  /* ---------- start ---------- */
+  function greeting() {
+    var h = new Date().getHours();
+    return (h < 5 ? "Boa madrugada" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + ", " + cfg.title + ". Todos os sistemas estão operacionais. Em que posso ajudar?";
+  }
+  $("goBtn").addEventListener("click", async function () {
+    $("start").hidden = true;
+    try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {}
+    if (!cfg.key) { openSettings(); addMsg("sys", "Cole sua chave do Gemini para começar."); return; }
+    var g = greeting(); addMsg("ai", g);
+    conv = true; idleMisses = 0;
+    await speak(g); setState("idle", "Em espera");
+    if (conv) startListen();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { conv = false; try { if (recog) recog.stop(); } catch (e) {} try { speechSynthesis.cancel(); } catch (e) {} }
+  });
+
+  if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
+})();
+</script>
+</body>
+</html>
